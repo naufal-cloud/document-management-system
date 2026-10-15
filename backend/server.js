@@ -5,6 +5,7 @@ const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
+const pool = require('./config/database')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -29,7 +30,7 @@ app.use(
   }),
 )
 
-// Endpoint untuk memeriksa apakah backend berjalan.
+// Health check backend
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -38,7 +39,34 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// Menangani alamat API yang belum tersedia.
+// Health check PostgreSQL
+// Khusus development lokal, hapus atau lindungi
+// endpoint ini sebelum deployment publik.
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/health/db', async (req, res) => {
+    try {
+      await pool.query('SELECT 1')
+
+      res.json({
+        success: true,
+        message: 'PostgreSQL Supabase terhubung',
+        database: 'PostgreSQL',
+        status: 'connected',
+        timestamp: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Database connection error:', err.message)
+
+      res.status(503).json({
+        success: false,
+        message: 'Koneksi database gagal.',
+        status: 'disconnected',
+      })
+    }
+  })
+}
+
+// API route tidak ditemukan
 app.use('/api', (req, res) => {
   res.status(404).json({
     success: false,
@@ -46,7 +74,7 @@ app.use('/api', (req, res) => {
   })
 })
 
-// Penanganan error umum.
+// Error handling
 app.use((err, req, res, next) => {
   console.error('Server error:', err.message)
 
